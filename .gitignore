@@ -1,0 +1,18 @@
+# Session files
+*.jsonl
+debug/
+session-env/
+shell-snapshots/
+
+# Credentials
+*.credential
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
