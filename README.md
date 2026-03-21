@@ -1,8 +1,111 @@
 # Agents Zone Skillset
 
-Ready-to-use [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) agents, skills, and commands that implement the engineering practices described in the [Harness Engineering Playbook](https://github.com/lipingtababa/harness-engineering-playbook).
+> **This is a reference implementation.** These are real agents, skills, and commands extracted from a production development team's daily workflow. They are not tutorials or toy examples — they are the actual files that orchestrate TDD, quality control, and CI/CD healing in a working codebase. Use them as a starting point, adapt them to your project, and evolve them as you learn what works for your team.
 
-The playbook explains **why** — closed-loop verification, specification-driven development, adversarial QC. This repo provides the **how** — copy these files into your Claude Code setup and start using them.
+A companion to the [Harness Engineering Playbook](https://github.com/lipingtababa/harness-engineering-playbook) for [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview). The playbook explains **why** — closed-loop verification, specification-driven development, adversarial QC. This repo provides the **how**.
+
+---
+
+## The Team: Roles and How They Work Together
+
+This skillset defines a small, specialised team of AI roles. Each role has a clear responsibility, and they collaborate through a strict handoff protocol with quality gates at every boundary.
+
+### The Roles
+
+**Product Owner** — `/prd` command
+Translates a product idea into a structured PRD (Product Requirements Document). Asks clarifying questions, researches infrastructure constraints, separates MVP from future phases. Produces `PRD.md` — the "what and why" that everything downstream depends on.
+
+**Architect** — `/architect` command
+Takes the PRD and designs the technical architecture: component diagrams, API design, data flows, deployment strategy. Produces `ARCHITECTURE.md` — the "how" that bridges requirements to implementation. Verifies patterns against the actual codebase rather than inventing new ones.
+
+**Story Writer** — `/story` command
+Transforms PRD + Architecture into hyper-detailed developer stories. Each story is a self-contained briefing pack: acceptance criteria, test scenarios, exact file paths, utility references, anti-patterns. The story file is the **single source of truth** — tester and coder will read nothing else.
+
+**Tester** — `agents/tester.md`
+TDD Red phase. Reads the story and writes failing tests. Critically, the tester designs tests from **requirements**, not from implementation code. This is deliberate — it prevents the [collusion problem](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03b-collusion.md) where AI writes tests that merely confirm what the code happens to do. The tester verifies that all tests fail (because the feature doesn't exist yet), then hands off.
+
+**Coder** — `agents/coder.md`
+TDD Green phase. Reads the same story plus the failing tests, then implements code to make them pass. Follows patterns from the story's technical context. Has a 3-iteration limit — if tests still fail after 3 attempts, it stops and reports the blockage rather than spiralling.
+
+**QC Auditor** — `skills/qc.md`
+The adversarial verifier. Doesn't trust anyone's claims. When the tester says "all AC covered", QC reads the actual test code and checks. When the coder says "all tests pass", QC runs them. Catches fake tests (tests that pass regardless of implementation), missing coverage, placeholder code (`TODO`, `NotImplemented`), and mismatches between claims and reality. This is the [agent-verifies-agent](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03e-adversarial-verification.md) pattern in action.
+
+**CI/CD Healer** — `skills/follow.md`
+Monitors GitHub Actions after a push. When checks fail, it downloads logs, categorises failures (lint, test, build, deploy), applies fixes, validates locally, pushes, and waits for CI again. Max 2 iterations — if the same error persists, it stops with a detailed root cause analysis and suggested manual fix. Saves 50-60% of the time developers spend on CI failures.
+
+**Conductor** — `commands/conduct.md`
+The orchestrator. Reads `PROGRESS.md` to know where the project left off, validates prerequisites for the next phase, executes it (launching the appropriate command or subagent), updates progress, and moves on. Enables autonomous story completion — you can type `/conduct` and walk away. It will run tester → QC → coder → QC → commit → push → CI monitoring without asking for permission at each step.
+
+**Mentor** — `commands/mentor.md`
+The knowledge propagator. When you discover a lesson ("always check for existing fixtures before creating new ones"), the mentor analyses which agents/commands would benefit, finds the right section in each file, and embeds the lesson organically — matching the document's tone and structure. This is how the team learns and improves over time.
+
+### How They Collaborate
+
+```
+         YOU
+          │
+          │ "Add user authentication"
+          ▼
+    ┌───────────┐
+    │  Product   │ ── Researches, asks questions, produces PRD.md
+    │  Owner     │
+    └─────┬─────┘
+          │ PRD.md
+          ▼
+    ┌───────────┐
+    │ Architect  │ ── Designs components, data flow, produces ARCHITECTURE.md
+    └─────┬─────┘
+          │ ARCHITECTURE.md
+          ▼
+    ┌───────────┐
+    │  Story     │ ── Creates self-contained briefing: AC, test plan, file paths
+    │  Writer    │
+    └─────┬─────┘
+          │ story.md (single source of truth)
+          │
+    ╔═════╧═══════════════════════════════════════╗
+    ║  CONDUCTOR orchestrates everything below     ║
+    ╚═════╤═══════════════════════════════════════╝
+          │
+          ▼
+    ┌───────────┐     story.md
+    │  Tester    │ ◄──────────── reads requirements, NOT implementation
+    │ (Red)      │
+    └─────┬─────┘
+          │ failing tests
+          ▼
+    ┌───────────┐
+    │ QC Auditor │ ── Are these REAL tests? Do they cover all AC?
+    └─────┬─────┘
+          │ ✅ pass (or ❌ back to tester)
+          ▼
+    ┌───────────┐     story.md + failing tests
+    │  Coder     │ ◄──────────── implements to make tests pass
+    │ (Green)    │
+    └─────┬─────┘
+          │ passing code
+          ▼
+    ┌───────────┐
+    │ QC Auditor │ ── No placeholders? No fake passes? Matches story?
+    └─────┬─────┘
+          │ ✅ pass (or ❌ back to coder)
+          ▼
+    ┌───────────┐
+    │  CI/CD     │ ── Push, monitor GitHub Actions, auto-fix failures
+    │  Healer    │
+    └─────┬─────┘
+          │
+          ▼
+       Done ✅
+```
+
+**Key design principles:**
+
+1. **Information flows one way** — each role reads the output of the previous role, never reaches back upstream
+2. **QC sits between every handoff** — nothing moves forward without adversarial verification
+3. **The story file is the single source of truth** — tester and coder read nothing else, preventing context drift
+4. **Failure loops are bounded** — coder gets 3 iterations, CI healer gets 2, then they stop and report
+5. **The conductor handles state** — `PROGRESS.md` survives across sessions, so you can pick up where you left off
 
 ---
 
@@ -11,10 +114,10 @@ The playbook explains **why** — closed-loop verification, specification-driven
 ### 1. Copy to your Claude Code config
 
 ```bash
-# Clone this repo
+# Clone
 git clone https://github.com/lipingtababa/agents-zone-skillset.git
 
-# Copy what you need into ~/.claude/
+# Copy what you need
 cp -r agents-zone-skillset/agents/ ~/.claude/agents/
 cp -r agents-zone-skillset/skills/ ~/.claude/skills/
 cp -r agents-zone-skillset/commands/ ~/.claude/commands/
@@ -24,46 +127,43 @@ cp -r agents-zone-skillset/hooks/ ~/.claude/hooks/
 
 ### 2. Reference in your CLAUDE.md
 
-Add to your project's `CLAUDE.md`:
-
 ```markdown
 ## Development Workflow
 
-Follow TDD workflow - write tests BEFORE implementing code.
+Follow TDD workflow — write tests BEFORE implementing code.
 
 ### Agents
-- **Tester**: `~/.claude/agents/tester.md` - writes failing tests from story
-- **Coder**: `~/.claude/agents/coder.md` - implements code to make tests pass
+- **Tester**: `~/.claude/agents/tester.md` — writes failing tests from story
+- **Coder**: `~/.claude/agents/coder.md` — implements code to make tests pass
 
 ### Quality Control
 - Run `/qc` after tester/coder complete work
 - Auto-QC triggers automatically on subagent completion
+
+### Workflow Orchestration
+- Run `/conduct` to execute the next phase automatically
+- PROGRESS.md tracks state across sessions
 ```
 
 ### 3. Customise placeholders
 
-Search for `[bracketed placeholders]` in the files and replace with your project specifics:
+Files use `[bracketed placeholders]` for project-specific values:
 
-```bash
-# Find all placeholders
-grep -r '\[.*\]' ~/.claude/commands/ | grep -v '#\|http\|bash\|---'
-```
-
-Common ones to replace:
-- `[project-root]` → your project directory (e.g., `~/myproject`)
-- `[service]` → your service name (e.g., `api`, `web`, `worker`)
-- `[your-org]` → your GitHub org
-- `[your-domain]` → your deployment domain
-- `[shared-lib]` → your shared library path
-- `[reference-app]` → your reference implementation path
+| Placeholder | Replace with | Example |
+|-------------|-------------|---------|
+| `[project-root]` | Your project directory | `~/myproject` |
+| `[service]` | Your service name | `api`, `web`, `worker` |
+| `[your-org]` | Your GitHub org | `mycompany` |
+| `[your-domain]` | Your deployment domain | `myapp.com` |
+| `[shared-lib]` | Your shared library path | `lib/`, `packages/shared/` |
+| `[reference-app]` | A reference implementation | `apps/example/` |
+| `[infrastructure-repo]` | Your infra repo | `terraform/`, `infra/` |
 
 ---
 
 ## Usage Examples
 
-### Example 1: Full feature from scratch
-
-Start with a product idea, end with deployed code:
+### Full feature from scratch
 
 ```
 You: /prd "Add user authentication with JWT"
@@ -80,22 +180,20 @@ Claude: [Creates hyper-detailed developer story with AC, test scenarios, file pa
 
 You: /conduct
 
-Claude: [Orchestrates tester → coder → QC → CI/CD automatically]
-  1. Launches tester subagent → writes failing tests (Red phase)
-  2. Auto-QC verifies test quality
-  3. Launches coder subagent → implements code (Green phase)
-  4. Auto-QC verifies implementation quality
-  5. Commits, pushes, monitors CI
+Claude: [Orchestrates the full pipeline automatically]
+  1. Launches tester → writes failing tests (Red phase)
+  2. Auto-QC verifies test quality → ✅ pass
+  3. Launches coder → implements code (Green phase)
+  4. Auto-QC verifies implementation → ✅ pass
+  5. Commits, pushes, monitors CI → ✅ all green
 ```
 
-### Example 2: Fix failing CI
-
-Your PR has red checks:
+### Fix failing CI
 
 ```
 You: /follow
 
-Claude: [Downloads CI logs, categorises failures]
+Claude:
   Found: 3 lint errors, 1 test failure
 
   Iteration 1:
@@ -106,159 +204,111 @@ Claude: [Downloads CI logs, categorises failures]
   - Waiting for CI... ✅ All green!
 ```
 
-### Example 3: Quality control a PR
-
-You want to verify tester and coder claims:
+### Audit quality of completed work
 
 ```
 You: /qc stories/user-auth.md --phase=both
 
-Claude: [Reads story, extracts requirements, audits both phases]
-
-  ## Tester Claims Verification
+Claude:
+  Tester Claims:
   ✅ "Test covers authentication" → VERIFIED (tests both 200 and 401)
-  ❌ "Test covers rate limiting" → FAKE TEST (only tests success, no failure case)
+  ❌ "Test covers rate limiting" → FAKE TEST (only tests success case)
 
-  ## Coder Claims Verification
+  Coder Claims:
   ✅ "Implemented JWT validation" → VERIFIED
   ⚠️  "Added error handling" → PARTIAL (missing timeout handling)
 
-  ## Required Actions
-  1. Fix fake rate limiting test
+  Must Fix:
+  1. Fix fake rate limiting test (circular validation)
   2. Add timeout error handling
 ```
 
-### Example 4: Teach a lesson to all agents
-
-You discovered a pattern that agents should follow:
+### Teach the team a lesson
 
 ```
 You: /mentor Always check for existing test fixtures before creating new ones
 
-Claude: [Analyses lesson, routes to relevant targets]
-  ✅ Routed to tester.md (HIGH relevance) - embedded in "Step 2: Write Tests"
-  ✅ Routed to coder.md (MEDIUM relevance) - embedded in "Implementation Standards"
+Claude:
+  ✅ Routed to tester.md (HIGH) — embedded in "Step 2: Write Tests"
+  ✅ Routed to coder.md (MEDIUM) — embedded in "Implementation Standards"
   Skipped: architect.md, prd.md (not relevant)
 ```
 
-### Example 5: Resume work across sessions
-
-You started a feature yesterday and want to continue:
+### Resume across sessions
 
 ```
 You: /conduct
 
 Claude: [Reads PROGRESS.md]
-  📍 Current State:
-  - Feature: User Authentication
-  - Phase: Implementation (Testing ✅ complete)
-  - Next: Launch coder subagent
+  📍 Feature: User Authentication
+  📍 Phase: Implementation (Testing ✅ complete)
+  📍 Next: Launch coder subagent
 
   ▶️ Executing Implementation phase...
-  [Launches coder with story context, monitors progress]
 ```
 
 ---
 
-## What's Inside
+## File Reference
 
-### Agents — Subagent definitions for Claude Code
+### Agents
 
-| File | Role | Playbook Chapter |
-|------|------|-----------------|
-| [`agents/tester.md`](agents/tester.md) | TDD Red phase: writes failing tests from requirements | Ch.3 Verification |
-| [`agents/coder.md`](agents/coder.md) | TDD Green phase: implements code to pass tests | Ch.3 Verification |
+| File | Role | Description |
+|------|------|-------------|
+| [`agents/tester.md`](agents/tester.md) | Tester | TDD Red phase. Writes failing tests from story requirements. Designs from AC, not implementation. |
+| [`agents/coder.md`](agents/coder.md) | Coder | TDD Green phase. Implements code to pass tests. 3-iteration limit, then reports blockage. |
 
-**Key design**: Tester designs tests from **requirements**, not implementation. This prevents the [collusion problem](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03b-collusion.md) where AI writes tests that merely confirm what the code does.
+### Skills
 
-### Skills — Reusable capabilities
+| File | Role | Description |
+|------|------|-------------|
+| [`skills/qc.md`](skills/qc.md) | QC Auditor | Adversarial verification. Reads actual code to verify claims. Catches fake tests, placeholders, missing coverage. |
+| [`skills/follow.md`](skills/follow.md) | CI/CD Healer | Auto-fixes GitHub Actions failures. Downloads logs, categorises, fixes, validates locally, pushes. Max 2 iterations. |
+| [`skills/auto_qc.md`](skills/auto_qc.md) | Auto-QC Trigger | Detects subagent completion reports and automatically triggers QC. Blocks progression on failure. |
 
-| File | Purpose | Playbook Chapter |
-|------|---------|-----------------|
-| [`skills/qc.md`](skills/qc.md) | Adversarial QC: verifies claims against reality | Ch.3e Agent-verifies-Agent |
-| [`skills/follow.md`](skills/follow.md) | CI/CD self-healing: auto-fixes GitHub Actions failures | Ch.3d Continuous Feedback |
-| [`skills/auto_qc.md`](skills/auto_qc.md) | Auto-triggers QC after subagent completion | Ch.3d Continuous Feedback |
+### Commands
 
-**Key design**: QC acts as an **adversarial auditor** — it doesn't trust tester/coder claims. It reads the actual code to verify. This implements the [adversarial verification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03e-adversarial-verification.md) pattern from the playbook.
+| File | Role | Description |
+|------|------|-------------|
+| [`commands/prd.md`](commands/prd.md) | Product Owner | Research-first PRD creation. Validates assumptions before documenting. MVP-phased. |
+| [`commands/architect.md`](commands/architect.md) | Architect | Transforms PRD into technical architecture. Verifies against actual codebase patterns. |
+| [`commands/story.md`](commands/story.md) | Story Writer | Creates self-contained developer stories. Single source of truth for tester/coder. |
+| [`commands/conduct.md`](commands/conduct.md) | Conductor | Orchestrates full workflow from PROGRESS.md. Autonomous story completion. |
+| [`commands/qc.md`](commands/qc.md) | QC (user docs) | User-facing documentation for the QC command. Phase-specific checks. |
+| [`commands/follow.md`](commands/follow.md) | CI/CD (user docs) | User-facing documentation for the follow command. Deployment monitoring. |
+| [`commands/setup.md`](commands/setup.md) | Environment Setup | Git worktrees, dependency validation, environment readiness checks. |
+| [`commands/mentor.md`](commands/mentor.md) | Mentor | Embeds lessons into agent/command documentation. Dynamic discovery and routing. |
 
-### Commands — User-facing workflows
+### Templates
 
-| File | What it does | Playbook Chapter |
-|------|-------------|-----------------|
-| [`commands/prd.md`](commands/prd.md) | Research-first PRD creation | Ch.2 Specification |
-| [`commands/architect.md`](commands/architect.md) | Architecture design from PRD | Ch.2 Specification |
-| [`commands/story.md`](commands/story.md) | Hyper-detailed developer stories | Ch.2b Machine-readable Spec |
-| [`commands/conduct.md`](commands/conduct.md) | Orchestrate full workflow from PROGRESS.md | Ch.4e Letting Go |
-| [`commands/qc.md`](commands/qc.md) | Quality control (user docs) | Ch.3 Verification |
-| [`commands/follow.md`](commands/follow.md) | CI/CD self-healing (user docs) | Ch.3d Continuous Feedback |
-| [`commands/setup.md`](commands/setup.md) | Dev environment setup | Ch.5c Platform Engineering |
-| [`commands/mentor.md`](commands/mentor.md) | Embed lessons into agent docs | Ch.2d Tacit Knowledge |
+| File | Description |
+|------|-------------|
+| [`templates/architecture.md`](templates/architecture.md) | 14-section architecture document scaffold |
+| [`templates/prd.md`](templates/prd.md) | MVP-phased PRD template |
+| [`templates/progress.md`](templates/progress.md) | Cross-session progress tracker |
 
-### Templates — Document scaffolds
+### Hooks
 
-| File | Purpose |
-|------|---------|
-| [`templates/architecture.md`](templates/architecture.md) | Architecture doc template (14 sections) |
-| [`templates/prd.md`](templates/prd.md) | PRD template (MVP-phased) |
-| [`templates/progress.md`](templates/progress.md) | Progress tracking template |
-
-### Hooks — Safety guardrails
-
-| File | Purpose |
-|------|---------|
-| [`hooks/validate-git.py`](hooks/validate-git.py) | Blocks `git add .` and `git add -A` to prevent accidental commits |
+| File | Description |
+|------|-------------|
+| [`hooks/validate-git.py`](hooks/validate-git.py) | Blocks `git add .` and `git add -A` to prevent accidental commits of sensitive files |
 
 ---
 
-## The Closed-Loop Workflow
-
-This diagram shows how the pieces fit together. Each arrow is a quality gate — nothing moves forward without verification.
-
-```
-  /prd ──→ /architect ──→ /story
-    │          │             │
-    │     [Specification]    │
-    │     (Playbook Ch.2)    │
-    ▼                        ▼
-  PRD.md              story.md
-                         │
-              ┌──────────┴──────────┐
-              ▼                     ▼
-         tester agent          coder agent
-         (Red phase)           (Green phase)
-              │                     │
-              ▼                     ▼
-         auto /qc ◄────────── auto /qc
-         [Verification]       [Verification]
-         (Playbook Ch.3)      (Playbook Ch.3)
-              │                     │
-              └──────────┬──────────┘
-                         ▼
-                      /follow
-                   [CI/CD healing]
-                         │
-                         ▼
-                       Done ✅
-```
-
-**`/conduct` orchestrates this entire flow automatically** — it reads PROGRESS.md, determines the current phase, executes the next step, and updates progress. You can walk away and come back.
-
----
-
-## Relationship to the Playbook
+## Mapping to the Playbook
 
 | Playbook Concept | Implementation Here |
 |-----------------|-------------------|
-| [Specification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02-specification.md) | `/prd`, `/architect`, `/story` commands + templates |
-| [Test-first verification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03a-test-first.md) | `tester.md` agent (Red phase before Green) |
+| [Specification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02-specification.md) | `/prd` + `/architect` + `/story` + templates |
+| [Test-first verification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03a-test-first.md) | Tester agent (Red phase before Green) |
 | [Anti-collusion](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03b-collusion.md) | Tester designs from requirements, not implementation |
-| [Adversarial verification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03e-adversarial-verification.md) | `qc.md` skill audits claims with evidence |
-| [Continuous feedback](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03d-continuous-feedback.md) | `auto_qc.md` + `/follow` for CI healing |
-| [Task decomposition](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04b-task-decomposition.md) | `/story` breaks features into tester→coder tasks |
-| [Context engineering](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04c-context-engineering.md) | Story file = single source of truth for subagents |
-| [Memory engineering](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04d-memory.md) | PROGRESS.md + `/conduct` for cross-session continuity |
-| [Tacit knowledge](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02d-tacit-knowledge.md) | `/mentor` embeds lessons into agent documentation |
-| [Letting go](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04e-letting-go.md) | `/conduct` runs full story autonomously |
+| [Adversarial verification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03e-adversarial-verification.md) | QC auditor verifies claims with evidence |
+| [Continuous feedback](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03d-continuous-feedback.md) | Auto-QC + CI/CD healer |
+| [Task decomposition](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04b-task-decomposition.md) | Story writer breaks features into bounded tasks |
+| [Context engineering](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04c-context-engineering.md) | Story file as single source of truth |
+| [Memory engineering](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04d-memory.md) | PROGRESS.md + conductor for cross-session state |
+| [Tacit knowledge](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02d-tacit-knowledge.md) | Mentor embeds lessons into documentation |
+| [Letting go](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04e-letting-go.md) | Conductor runs full story autonomously |
 
 ---
 
@@ -266,8 +316,7 @@ This diagram shows how the pieces fit together. Each arrow is a quality gate —
 
 Found a bug? Have a better pattern? PRs welcome.
 
-When contributing:
-- Keep files self-contained (each agent/skill/command should work independently)
+- Keep files self-contained — each agent/skill/command works independently
 - Use `[bracketed placeholders]` for project-specific values
 - Test with Claude Code before submitting
 
