@@ -1,6 +1,6 @@
 # Agents Zone Skillset
 
-> **This is a reference implementation.** These are real agents, skills, and commands extracted from a production development team's daily workflow. They are not tutorials or toy examples — they are the actual files that orchestrate TDD, quality control, and CI/CD healing in a working codebase. Use them as a starting point, adapt them to your project, and evolve them as you learn what works for your team.
+> **This is a reference implementation.** These are real agents and skills extracted from a production development team's daily workflow. They are not tutorials or toy examples — they are the actual files that orchestrate TDD, quality control, and CI/CD healing in a working codebase. Use them as a starting point, adapt them to your project, and evolve them as you learn what works for your team.
 
 A companion to the [Harness Engineering Playbook](https://github.com/lipingtababa/harness-engineering-playbook) for [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview). The playbook explains **why** — closed-loop verification, specification-driven development, adversarial QC. This repo provides the **how**.
 
@@ -12,13 +12,13 @@ This skillset defines a small, specialised team of AI roles. Each role has a cle
 
 ### The Roles
 
-**Product Owner** — `/prd` command
+**Product Owner** — `skills/prd.md`
 Translates a product idea into a structured PRD (Product Requirements Document). Asks clarifying questions, researches infrastructure constraints, separates MVP from future phases. Produces `PRD.md` — the "what and why" that everything downstream depends on.
 
-**Architect** — `/architect` command
+**Architect** — `skills/architect.md`
 Takes the PRD and designs the technical architecture: component diagrams, API design, data flows, deployment strategy. Produces `ARCHITECTURE.md` — the "how" that bridges requirements to implementation. Verifies patterns against the actual codebase rather than inventing new ones.
 
-**Story Writer** — `/story` command
+**Story Writer** — `skills/story.md`
 Transforms PRD + Architecture into hyper-detailed developer stories. Each story is a self-contained briefing pack: acceptance criteria, test scenarios, exact file paths, utility references, anti-patterns. The story file is the **single source of truth** — tester and coder will read nothing else.
 
 **Tester** — `agents/tester.md`
@@ -30,14 +30,20 @@ TDD Green phase. Reads the same story plus the failing tests, then implements co
 **QC Auditor** — `skills/qc.md`
 The adversarial verifier. Doesn't trust anyone's claims. When the tester says "all AC covered", QC reads the actual test code and checks. When the coder says "all tests pass", QC runs them. Catches fake tests (tests that pass regardless of implementation), missing coverage, placeholder code (`TODO`, `NotImplemented`), and mismatches between claims and reality. This is the [agent-verifies-agent](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03e-adversarial-verification.md) pattern in action.
 
+**Auto-QC Trigger** — `skills/auto_qc.md`
+Listens for subagent completion reports and automatically triggers QC. When a tester or coder reports "done", auto-QC detects it, runs the appropriate checks, and blocks progression if quality gates fail. No manual `/qc` invocation needed.
+
 **CI/CD Healer** — `skills/follow.md`
 Monitors GitHub Actions after a push. When checks fail, it downloads logs, categorises failures (lint, test, build, deploy), applies fixes, validates locally, pushes, and waits for CI again. Max 2 iterations — if the same error persists, it stops with a detailed root cause analysis and suggested manual fix. Saves 50-60% of the time developers spend on CI failures.
 
-**Conductor** — `commands/conduct.md`
-The orchestrator. Reads `PROGRESS.md` to know where the project left off, validates prerequisites for the next phase, executes it (launching the appropriate command or subagent), updates progress, and moves on. Enables autonomous story completion — you can type `/conduct` and walk away. It will run tester → QC → coder → QC → commit → push → CI monitoring without asking for permission at each step.
+**Conductor** — `skills/conduct.md`
+The orchestrator. Reads `PROGRESS.md` to know where the project left off, validates prerequisites for the next phase, executes it (launching the appropriate skill or subagent), updates progress, and moves on. Enables autonomous story completion — you can type `/conduct` and walk away. It will run tester → QC → coder → QC → commit → push → CI monitoring without asking for permission at each step.
 
-**Mentor** — `commands/mentor.md`
-The knowledge propagator. When you discover a lesson ("always check for existing fixtures before creating new ones"), the mentor analyses which agents/commands would benefit, finds the right section in each file, and embeds the lesson organically — matching the document's tone and structure. This is how the team learns and improves over time.
+**Environment Setup** — `skills/setup.md`
+Prepares the development environment: git worktrees for parallel development, dependency validation, build verification. Optional — many developers skip this and work directly in the main repo.
+
+**Mentor** — `skills/mentor.md`
+The knowledge propagator. When you discover a lesson ("always check for existing fixtures before creating new ones"), the mentor analyses which agents and skills would benefit, finds the right section in each file, and embeds the lesson organically — matching the document's tone and structure. This is how the team learns and improves over time.
 
 ### How They Collaborate
 
@@ -120,7 +126,6 @@ git clone https://github.com/lipingtababa/agents-zone-skillset.git
 # Copy what you need
 cp -r agents-zone-skillset/agents/ ~/.claude/agents/
 cp -r agents-zone-skillset/skills/ ~/.claude/skills/
-cp -r agents-zone-skillset/commands/ ~/.claude/commands/
 cp -r agents-zone-skillset/templates/ ~/.claude/templates/
 cp -r agents-zone-skillset/hooks/ ~/.claude/hooks/
 ```
@@ -262,22 +267,15 @@ Claude: [Reads PROGRESS.md]
 
 | File | Role | Description |
 |------|------|-------------|
+| [`skills/prd.md`](skills/prd.md) | Product Owner | Research-first PRD creation. Validates assumptions before documenting. MVP-phased. |
+| [`skills/architect.md`](skills/architect.md) | Architect | Transforms PRD into technical architecture. Verifies against actual codebase patterns. |
+| [`skills/story.md`](skills/story.md) | Story Writer | Creates self-contained developer stories. Single source of truth for tester/coder. |
 | [`skills/qc.md`](skills/qc.md) | QC Auditor | Adversarial verification. Reads actual code to verify claims. Catches fake tests, placeholders, missing coverage. |
-| [`skills/follow.md`](skills/follow.md) | CI/CD Healer | Auto-fixes GitHub Actions failures. Downloads logs, categorises, fixes, validates locally, pushes. Max 2 iterations. |
 | [`skills/auto_qc.md`](skills/auto_qc.md) | Auto-QC Trigger | Detects subagent completion reports and automatically triggers QC. Blocks progression on failure. |
-
-### Commands
-
-| File | Role | Description |
-|------|------|-------------|
-| [`commands/prd.md`](commands/prd.md) | Product Owner | Research-first PRD creation. Validates assumptions before documenting. MVP-phased. |
-| [`commands/architect.md`](commands/architect.md) | Architect | Transforms PRD into technical architecture. Verifies against actual codebase patterns. |
-| [`commands/story.md`](commands/story.md) | Story Writer | Creates self-contained developer stories. Single source of truth for tester/coder. |
-| [`commands/conduct.md`](commands/conduct.md) | Conductor | Orchestrates full workflow from PROGRESS.md. Autonomous story completion. |
-| [`commands/qc.md`](commands/qc.md) | QC (user docs) | User-facing documentation for the QC command. Phase-specific checks. |
-| [`commands/follow.md`](commands/follow.md) | CI/CD (user docs) | User-facing documentation for the follow command. Deployment monitoring. |
-| [`commands/setup.md`](commands/setup.md) | Environment Setup | Git worktrees, dependency validation, environment readiness checks. |
-| [`commands/mentor.md`](commands/mentor.md) | Mentor | Embeds lessons into agent/command documentation. Dynamic discovery and routing. |
+| [`skills/follow.md`](skills/follow.md) | CI/CD Healer | Auto-fixes GitHub Actions failures. Downloads logs, categorises, fixes, validates locally, pushes. Max 2 iterations. |
+| [`skills/conduct.md`](skills/conduct.md) | Conductor | Orchestrates full workflow from PROGRESS.md. Autonomous story completion. |
+| [`skills/setup.md`](skills/setup.md) | Environment Setup | Git worktrees, dependency validation, environment readiness checks. |
+| [`skills/mentor.md`](skills/mentor.md) | Mentor | Embeds lessons into agent and skill documentation. Dynamic discovery and routing. |
 
 ### Templates
 
@@ -299,7 +297,7 @@ Claude: [Reads PROGRESS.md]
 
 | Playbook Concept | Implementation Here |
 |-----------------|-------------------|
-| [Specification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02-specification.md) | `/prd` + `/architect` + `/story` + templates |
+| [Specification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02-specification.md) | `prd` + `architect` + `story` skills + templates |
 | [Test-first verification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03a-test-first.md) | Tester agent (Red phase before Green) |
 | [Anti-collusion](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03b-collusion.md) | Tester designs from requirements, not implementation |
 | [Adversarial verification](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/03e-adversarial-verification.md) | QC auditor verifies claims with evidence |
@@ -316,7 +314,7 @@ Claude: [Reads PROGRESS.md]
 
 Found a bug? Have a better pattern? PRs welcome.
 
-- Keep files self-contained — each agent/skill/command works independently
+- Keep files self-contained — each agent/skill works independently
 - Use `[bracketed placeholders]` for project-specific values
 - Test with Claude Code before submitting
 
