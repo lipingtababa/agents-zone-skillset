@@ -42,8 +42,8 @@ Push 后监控 GitHub Actions。当检查失败，下载日志、分类故障（
 **环境搭建 (Environment Setup)** — `skills/setup.md`
 准备开发环境：Git Worktree 用于并行开发、依赖验证、构建检查。可选 — 很多开发者跳过这步直接在主仓库工作。
 
-**HR（人力资源）** — `skills/hr.md`
-团队能力的守护者。详见下方专题。
+**HRBP（人力资源业务伙伴）** — `skills/mentor.md`
+把项目需求翻译成团队能力。详见下方专题。
 
 ### 协作流程
 
@@ -114,159 +114,88 @@ Push 后监控 GitHub Actions。当检查失败，下载日志、分类故障（
 
 ---
 
-## HR：整个 Skill System 的灵魂
+## HRBP：整个 Skill System 的灵魂
 
-HR（Human Resources）不是修代码的 — 它是**发展团队能力的**。当有人产出了糟糕的结果，HR 问的是 "缺了什么指导"，而不是 "谁搞砸了"。
+HRBP（HR Business Partner）不是修代码的 — 它是**把项目需求翻译成团队能力的**。
 
-这是这套系统最关键的设计：**Agent 和 Skill 的质量决定了所有产出的上限。** 如果测试员的指导文档没有教它检查现有 Fixture，它每次都会创建重复的 Fixture。如果编码员的文档没有说 "先查看已有的工具函数"，它每次都会重新发明轮子。HR 的工作就是确保这些指导文档始终完整、准确、没有冗余。
+这是这套系统最关键的设计：**Agent 和 Skill 的质量决定了所有产出的上限。** 通用模板能工作，但不够好 — 每个项目有自己的技术栈、约定、反模式、质量标准。HRBP 的工作就是拿着你告诉它的项目事实，更新相关的 Agent/Skill 文件，让整个团队在 *你的* 项目里开箱即用。
 
-### 为什么 HR 是灵魂？
+### 为什么 HRBP 是灵魂？
 
-其他角色解决的是 "当前这个功能怎么做好"。HR 解决的是 "团队怎么越来越好"。
+其他角色解决的是 "当前这个功能怎么做好"。HRBP 解决的是 "团队怎么适应这个项目"。
 
-想象一下：你发现编码员把业务逻辑写进了架构文档。你可以手动修复那个文档，但下次它还会犯同样的错。HR 的做法不同：
+想象一下：你的项目用 Go + Chi router，测试放在 `test/component/`，有一个黄金参考实现在 `internal/api/users/`。如果这些信息没有写进 Agent 文档，每个 Agent 每次都要从零猜起。HRBP 让你一句话告诉它，它帮你把信息嵌入到所有需要知道的角色文档中。
 
-1. **查历史** — 去翻会话日志，看当时发生了什么
-2. **找根因** — 哪个 Agent 或 Skill 在执行？它的指导文档缺了什么？
-3. **补漏洞** — 把教训嵌入到正确的文档中，确保下次不再犯
+**核心循环：**
 
-这就是从 "修一个 bug" 到 "消灭一类 bug" 的区别。
+```
+你告诉 HRBP 一个项目事实
+  → HRBP 找出哪些角色需要知道
+  → 提出修改方案
+  → 你确认或调整
+  → HRBP 应用修改
+  → 问你还有什么要补充的
+```
+
+这是一个**迭代过程** — 每次处理一个关注点，做好它，然后问下一个。
 
 ### 命令
 
 ```bash
-/hr <教训>                      # 把教训嵌入到相关的 Agent/Skill 文档中
-/hr audit                       # 对所有 Agent 和 Skill 做一次全面质量审计
-/hr audit <文件>                 # 审计某个特定的 Agent 或 Skill 文件
-/hr dedup                       # 查找跨文件的重复内容
-/hr dedup --fix                 # 查找重复并提出修复方案
-/hr list                        # 列出所有发现的 Agent 和 Skill
+/hr <项目需求>                   # 把项目需求嵌入到相关的 Agent/Skill 文档中
+/hr audit                       # 检查所有文件的项目适配度（过期引用、未填占位符、冲突、缺口）
+/hr review <文件>                # 审查某个特定文件的项目适配度
+/hr list                        # 列出所有 Agent/Skill 及其当前的项目定制
 ```
 
-### 三大核心能力
+### 输入类型
 
-#### 能力一：问题调查与教训路由
+| 类型 | 示例 |
+|------|------|
+| 技术栈 | "Go + Chi router, PostgreSQL, Redis" |
+| 约定 | "测试文件放在 `test/component/`，不放在源码旁边" |
+| 约束 | "不要动 `pkg/shared/` 下的文件" |
+| 质量标准 | "每个 PR 必须有集成测试" |
+| 反模式 | "不用 ORM，我们用 sqlx 写原生 SQL" |
+| 参考实现 | "`internal/api/users/` 是标准写法" |
 
-当问题出现时（代码放错地方、输出质量差、工作流断裂），HR **不直接修复产物**。产物是症状，HR 修的是团队。
+### 路由逻辑
 
-**调查流程：**
+| 输入 | HIGH | MEDIUM | 跳过 |
+|------|------|--------|------|
+| "测试放在 `test/component/`" | tester | coder | architect, prd |
+| "用 Chi router" | coder, architect | tester | prd, qc |
+| "每个 PR 要集成测试" | tester, qc | coder | prd, architect |
 
-1. **查历史** — 检查 `.claude` 的会话记录，看问题是怎么产生的
-2. **读文档** — 读所有相关的 Agent 和 Skill 文件，找出哪个文件本应防止这个问题
-3. **问** — 哪个 Agent 或 Skill 在事发时是活跃的？它遵循的是什么指导？缺了什么？
-4. **定位漏洞** — 一条缺失的规则、一个模糊的边界、一个默认的假设
-5. **路由教训** — 把教训嵌入正确的文件，填补漏洞
+### 审计模式
 
-**实际例子：**
+审计不是查代码质量 — 是查**项目适配度**：
 
-```
-你: /hr 永远不要在架构文档里写代码片段，代码属于实现
+- **过期引用** — 文件里提到的路径/模式在项目中已经不存在了
+- **未填占位符** — `[方括号占位符]` 本该被替换成项目值
+- **冲突** — 两个文件对同一个项目事实给出矛盾的指导
+- **缺口** — 某个角色完全没有项目定制（可能需要你的输入）
 
-HR:
-  调查: 检查了 architect.md 的当前指导...
-  发现: 架构师文档没有明确禁止代码片段
-
-  教训路由完成
-
-  目标发现: 11 个文件
-  路由到: 2 个文件
-  - skills/architect.md (HIGH)
-    - 章节: "产出规范"
-    - 变更: 添加了 "架构文档不包含代码片段" 规则
-  - skills/prd.md (MEDIUM)
-    - 章节: "PRD 范围"
-    - 变更: 强化了 "PRD 只关注产品/业务，代码属于技术文档" 的规则
-  跳过: tester.md, coder.md, qc.md... (不相关)
-```
-
-**相关性评分：**
-
-| 评分 | 标准 | 动作 |
-|------|------|------|
-| HIGH | 关键词匹配目标描述，角色被明确提及 | 必须路由 |
-| MEDIUM | 部分重叠，跨领域关注点 | 如果适用则路由 |
-| LOW/NO | 无关键词重叠，不同关注领域 | 跳过 |
-
-#### 能力二：质量审计
-
-检查 Agent/Skill 文件的质量问题。审计不是挑毛病 — 是发现那些会降低团队效能的系统性问题。
-
-**审计清单：**
-
-| 维度 | 检查项 |
-|------|--------|
-| **内容质量** | 单一职责、无过期引用、无过期示例、Agent 花名册准确、无硬编码路径 |
-| **重复** | 文件内无重复内容、无跨文件复制粘贴、样板代码最小化 |
-| **精简** | Agent < 15KB / Skill < 20KB、无死章节、示例有存在价值 |
-| **一致性** | 与 CLAUDE.md 一致、同行文件不冲突、术语统一、模型引用最新 |
-| **正确性** | Frontmatter 完整有效、引用的工具存在、工作流与现实匹配 |
-
-**严重级别：**
-
-| 级别 | 含义 | 示例 |
-|------|------|------|
-| CRITICAL | 积极误导或已失效 | 引用了被删除的文件、错误的工作流 |
-| HIGH | 严重浪费或混淆 | 175 行重复的中英文内容 |
-| MEDIUM | 可维护性问题 | 同一段样板出现在 3 个文件中 |
-| LOW | 轻微改进机会 | 稍显过时的示例 |
-
-**审计报告示例：**
+缺口会以**问题**的形式反馈给你：
 
 ```
-审计完成: 11 个文件已扫描
+审计完成: 11 个文件
 
-CRITICAL (1):
-- skills/architect.md: 引用了不存在的 skills/deploy.md (第 45 行)
+问题:
+- agents/tester.md: 引用了 `test/unit/` 但项目用 `test/component/` (过期)
 
-HIGH (2):
-- agents/tester.md: Git 工作流样板与 coder.md 重复 (共 35 行)
-- skills/qc.md: 对 Auto-QC 的描述与 auto_qc.md 冲突
-
-MEDIUM (3):
-- agents/coder.md: 工作目录说明与 tester.md 重复
-- skills/conduct.md: Worktree 命名约定与 setup.md 重复
-- skills/follow.md: 选择性 git add 规则与 conduct.md 重复
-
-建议动作:
-1. 修复 architect.md 的过期引用 -- 解决 1 个 CRITICAL
-2. 把 Git 工作流样板提取到 CLAUDE.md -- 解决 2 个 HIGH + 3 个 MEDIUM
+缺口 — 需要你的输入:
+- agents/coder.md: 没有错误处理约定。这个项目怎么处理错误？
+- skills/qc.md: 没有集成测试要求。PR 是否必须有集成测试？
 ```
-
-#### 能力三：去重
-
-查找跨 Agent 和 Skill 文件的重复内容，提出整合方案。
-
-**常见重复模式：**
-
-| 模式 | 出现位置 | 修复方法 |
-|------|---------|---------|
-| 项目根路径 | coder, tester | 每个 Agent 一句话声明，不重复 |
-| 完成/QC 流程 | coder, tester | 保留在一个地方，其他引用 |
-| 选择性 git add 规则 | ship（权威） | 其他引用 ship |
-| 调试指南 | troubleshooter（权威） | coder 和 tester 引用它 |
-| 测试质量标准 | qc（权威） | tester 引用它 |
-
-**权威文件选择原则：**
-
-当同一内容出现在多个地方，权威归属选：
-- **概念所有者** — 该概念是这个文件的核心职责
-- **最完整版本** — 最丰富的处理
-- **最多被引用** — 其他文件已经指向它
-
-其他文件引用，不复制。
-
-### HR 不做什么
-
-- **不修产物** — 如果 architecture.md 里有代码，HR 不去改 architecture.md。用户或架构师去修产物。HR 修团队。
-- **不打补丁** — 添加一条规则来防止某个特定的错误太狭隘了。要识别错误的类别，写出覆盖这一类错误的指导。
-- **不无证据行动** — 在得出结论之前先读历史和文件。不假设你知道发生了什么。
 
 ### 核心原则
 
-- **教，不说教** — 教训应该是简洁的增补，不是长篇大论
-- **权威归属** — 每个概念有一个家，其他地方引用它
-- **带着同理心审计** — 文件是有机增长的，严重性反映的是影响而不是责备
-- **修重要的** — 175 行重复是 CRITICAL，一行重复的话是噪音
+- **迭代，不批量** — 一次处理一个关注点，问下一个
+- **确认再改** — 永远先给人看方案，人比你更懂项目
+- **具体胜于抽象** — 用真实路径和文件名，不说 "遵循现有模式"
+- **最小改动** — 加最少的内容表达需求，不写长篇解释
+- **项目上下文会过期** — 项目在变，审计命令就是为此存在的
 
 ---
 
@@ -304,9 +233,9 @@ cp -r agents-zone-skillset/hooks/ ~/.claude/hooks/
 - 运行 `/conduct` 自动执行下一阶段
 - PROGRESS.md 跨会话跟踪状态
 
-### 团队管理
-- 运行 `/hr <教训>` 把教训嵌入 Agent/Skill 文档
-- 运行 `/hr audit` 审计所有文档质量
+### 团队适配
+- 运行 `/hr <项目需求>` 把项目需求嵌入 Agent/Skill 文档
+- 运行 `/hr audit` 检查项目适配度
 ```
 
 ### 3. 替换占位符
@@ -387,42 +316,45 @@ Claude:
   2. 添加超时错误处理
 ```
 
-### 教团队一个教训
+### 告诉 HRBP 项目需求
 
 ```
-你: /hr 创建新 Fixture 之前永远先检查是否已有现成的
+你: /hr 测试文件放在 test/component/，不放在源码旁边
 
 Claude:
-  教训路由完成
+  分析: 测试文件位置约定
 
-  目标发现: 11 个文件
-  路由到: 2 个文件
-  - agents/tester.md (HIGH) — 嵌入 "步骤 2：写测试"
-  - agents/coder.md (MEDIUM) — 嵌入 "实现标准"
-  跳过: architect.md, prd.md（不相关）
+  建议修改:
+  - agents/tester.md (HIGH)
+    - 章节: "测试文件放置"
+    - 修改: 添加规则 — 测试写到 test/component/{feature}_test.go
+  - agents/coder.md (MEDIUM)
+    - 章节: "实现标准"
+    - 修改: 添加测试位置引用，方便查找测试
+
+  确认应用吗？
+
+你: 是
+
+Claude:
+  已应用。还有什么项目需求要告诉我？
 ```
 
-### 审计团队文档质量
+### 审计项目适配度
 
 ```
 你: /hr audit
 
 Claude:
-  审计完成: 11 个文件已扫描
+  审计完成: 11 个文件
 
-  CRITICAL (1):
-  - skills/follow.md: 引用了已删除的 deploy.sh 脚本
+  问题:
+  - skills/follow.md: 引用了已删除的 deploy.sh 脚本 (过期)
+  - skills/architect.md: 还有 [your-domain] 占位符 (未填)
 
-  HIGH (1):
-  - agents/tester.md: 调试章节与 coder.md 重复 42 行
-
-  MEDIUM (2):
-  - skills/conduct.md: Worktree 命名约定与 setup.md 重复
-  - agents/coder.md: 工作目录样板与 tester.md 重复
-
-  建议动作:
-  1. 更新 follow.md 的脚本引用 -- 解决 1 个 CRITICAL
-  2. 调试指南保留在 coder.md，tester.md 改为引用 -- 解决 1 个 HIGH
+  缺口 — 需要你的输入:
+  - agents/coder.md: 没有错误处理约定。这个项目怎么处理错误？
+  - skills/qc.md: 没有集成测试要求。PR 是否必须有集成测试？
 ```
 
 ### 跨会话恢复进度
@@ -461,7 +393,7 @@ Claude: [读取 PROGRESS.md]
 | [`skills/follow.md`](skills/follow.md) | CI/CD 自愈器 | 自动修复 GitHub Actions 失败。下载日志、分类、修复、本地验证、Push。最多 2 次迭代。 |
 | [`skills/conduct.md`](skills/conduct.md) | 指挥家 | 从 PROGRESS.md 编排完整工作流。自主完成整个故事。 |
 | [`skills/setup.md`](skills/setup.md) | 环境搭建 | Git Worktree、依赖验证、环境就绪检查。 |
-| [`skills/hr.md`](skills/hr.md) | HR | 团队能力管理。嵌入教训、审计质量、去重。整个系统的灵魂。 |
+| [`skills/mentor.md`](skills/mentor.md) | HRBP | 把项目需求翻译成团队能力。迭代式接收人类输入，更新 Agent/Skill 文档。整个系统的灵魂。 |
 
 ### Templates
 
@@ -491,7 +423,7 @@ Claude: [读取 PROGRESS.md]
 | [任务分解](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04b-task-decomposition.md) | Story Writer 把功能拆成有界的任务 |
 | [上下文工程](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04c-context-engineering.md) | 故事文件作为唯一信息源 |
 | [记忆工程](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04d-memory.md) | PROGRESS.md + Conductor 的跨会话状态 |
-| [隐性知识](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02d-tacit-knowledge.md) | HR 把教训嵌入文档 |
+| [隐性知识](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/02d-tacit-knowledge.md) | HRBP 把项目需求嵌入 Agent/Skill 文档 |
 | [放手](https://github.com/lipingtababa/harness-engineering-playbook/blob/main/chapters/04e-letting-go.md) | Conductor 自主运行完整故事 |
 
 ---
