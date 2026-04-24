@@ -42,7 +42,7 @@ Push 后监控 GitHub Actions。当检查失败，下载日志、分类故障（
 **环境搭建 (Environment Setup)** — `skills/setup.md`
 准备开发环境：Git Worktree 用于并行开发、依赖验证、构建检查。可选 — 很多开发者跳过这步直接在主仓库工作。
 
-**HRBP（人力资源业务伙伴）** — `skills/mentor.md`
+**HRBP（人力资源业务伙伴）** — `skills/hrbp.md`
 把项目需求翻译成团队能力。详见下方专题。
 
 ### 协作流程
@@ -393,7 +393,7 @@ Claude: [读取 PROGRESS.md]
 | [`skills/follow.md`](skills/follow.md) | CI/CD 自愈器 | 自动修复 GitHub Actions 失败。下载日志、分类、修复、本地验证、Push。最多 2 次迭代。 |
 | [`skills/conduct.md`](skills/conduct.md) | 指挥家 | 从 PROGRESS.md 编排完整工作流。自主完成整个故事。 |
 | [`skills/setup.md`](skills/setup.md) | 环境搭建 | Git Worktree、依赖验证、环境就绪检查。 |
-| [`skills/mentor.md`](skills/mentor.md) | HRBP | 把项目需求翻译成团队能力。迭代式接收人类输入，更新 Agent/Skill 文档。整个系统的灵魂。 |
+| [`skills/hrbp.md`](skills/hrbp.md) | HRBP | 把项目需求翻译成团队能力。迭代式接收人类输入，更新 Agent/Skill 文档。整个系统的灵魂。 |
 
 ### Templates
 
